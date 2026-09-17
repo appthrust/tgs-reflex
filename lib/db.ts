@@ -56,7 +56,11 @@ export async function loadLeaderboard(): Promise<Leaderboard> {
       created_at: string;
     }>(
       `SELECT id, name, average_ms, best_ms, created_at::text
-       FROM tgs_reflex_scores
+       FROM (
+         SELECT DISTINCT ON (name) id, name, average_ms, best_ms, created_at
+         FROM tgs_reflex_scores
+         ORDER BY name, average_ms ASC, best_ms ASC, id ASC
+       ) best_per_name
        ORDER BY average_ms ASC, best_ms ASC, id ASC
        LIMIT $1`,
       [LEADERBOARD_LIMIT],
@@ -76,18 +80,42 @@ export async function loadLeaderboard(): Promise<Leaderboard> {
   }
 }
 
+export interface SavedScore {
+  id: number;
+  rank: number;
+  total: number;
+}
+
 export async function insertScore(
   name: string,
   averageMs: number,
   bestMs: number,
-) {
+): Promise<SavedScore | null> {
   const client = getPool();
   if (!client) {
-    return;
+    return null;
   }
   await ensureSchema(client);
-  await client.query(
-    "INSERT INTO tgs_reflex_scores (name, average_ms, best_ms) VALUES ($1, $2, $3)",
+  const inserted = await client.query<{ id: number }>(
+    "INSERT INTO tgs_reflex_scores (name, average_ms, best_ms) VALUES ($1, $2, $3) RETURNING id",
     [name, averageMs, bestMs],
   );
+  const id = inserted.rows[0].id;
+  const ranked = await client.query<{ rank: string; total: string }>(
+    `WITH best_per_name AS (
+       SELECT DISTINCT ON (name) id, name, average_ms, best_ms
+       FROM tgs_reflex_scores
+       ORDER BY name, average_ms ASC, best_ms ASC, id ASC
+     )
+     SELECT
+       (SELECT count(*) FROM best_per_name
+        WHERE (average_ms, best_ms, id) < ($1::int, $2::int, $3::bigint)) + 1 AS rank,
+       (SELECT count(*) FROM best_per_name) AS total`,
+    [averageMs, bestMs, id],
+  );
+  return {
+    id,
+    rank: Number(ranked.rows[0].rank),
+    total: Number(ranked.rows[0].total),
+  };
 }

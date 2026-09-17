@@ -1,7 +1,15 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  useTransition,
+} from "react";
 import { submitScore } from "./actions";
+import { feedback } from "@/lib/feedback";
 import {
   MAX_NAME_LENGTH,
   MAX_WAIT_MS,
@@ -45,6 +53,35 @@ const ARENA_CLASS: Record<Phase, string> = {
   submitted: "arena-done",
 };
 
+const SOUND_KEY = "reflex:sound";
+const SOUND_EVENT = "reflex:sound-change";
+
+function subscribeSound(callback: () => void) {
+  window.addEventListener(SOUND_EVENT, callback);
+  window.addEventListener("storage", callback);
+  return () => {
+    window.removeEventListener(SOUND_EVENT, callback);
+    window.removeEventListener("storage", callback);
+  };
+}
+
+function readSound() {
+  try {
+    return localStorage.getItem(SOUND_KEY) !== "off";
+  } catch {
+    return true;
+  }
+}
+
+function writeSound(on: boolean) {
+  try {
+    localStorage.setItem(SOUND_KEY, on ? "on" : "off");
+  } catch {
+    // ignore
+  }
+  window.dispatchEvent(new Event(SOUND_EVENT));
+}
+
 const MEDAL = ["bg-amber-300 text-amber-950", "bg-slate-300 text-slate-900", "bg-orange-400 text-orange-950"];
 
 export function ReflexGame({ initial }: { initial: Leaderboard }) {
@@ -54,9 +91,16 @@ export function ReflexGame({ initial }: { initial: Leaderboard }) {
   const [name, setName] = useState("");
   const [board, setBoard] = useState(initial);
   const [savedId, setSavedId] = useState<number | null>(null);
+  const [rank, setRank] = useState<{ rank: number; total: number } | null>(null);
+  const sound = useSyncExternalStore(subscribeSound, readSound, () => true);
   const [isPending, startTransition] = useTransition();
   const goAt = useRef(0);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const soundRef = useRef(sound);
+
+  useEffect(() => {
+    soundRef.current = sound;
+  }, [sound]);
 
   useEffect(() => {
     return () => {
@@ -64,23 +108,32 @@ export function ReflexGame({ initial }: { initial: Leaderboard }) {
     };
   }, []);
 
-  function armRound() {
+  function toggleSound() {
+    const next = !sound;
+    if (next) feedback.prime();
+    writeSound(next);
+  }
+
+  const armRound = useCallback(() => {
     setPhase("waiting");
     if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(() => {
       goAt.current = performance.now();
       setPhase("go");
+      if (soundRef.current) feedback.go();
     }, randomWait());
-  }
+  }, []);
 
-  function start() {
+  const start = useCallback(() => {
     setTimes([]);
     setLastMs(0);
     setSavedId(null);
+    setRank(null);
     armRound();
-  }
+  }, [armRound]);
 
-  function tap() {
+  const tap = useCallback(() => {
+    if (soundRef.current) feedback.prime();
     switch (phase) {
       case "idle":
         start();
@@ -92,27 +145,58 @@ export function ReflexGame({ initial }: { initial: Leaderboard }) {
       case "waiting":
         if (timer.current) clearTimeout(timer.current);
         setPhase("early");
+        if (soundRef.current) feedback.early();
         return;
       case "go": {
         const ms = Math.round(performance.now() - goAt.current);
         const next = [...times, ms];
         setLastMs(ms);
         setTimes(next);
-        setPhase(next.length >= ROUNDS ? "finished" : "result");
+        if (next.length >= ROUNDS) {
+          setPhase("finished");
+          if (soundRef.current) feedback.finish();
+        } else {
+          setPhase("result");
+          if (soundRef.current) feedback.hit(ms);
+        }
         return;
       }
       default:
         return;
     }
-  }
+  }, [phase, times, start, armRound]);
+
+  // Keyboard: Space / Enter act as a tap while the arena is interactive.
+  useEffect(() => {
+    const interactivePhase =
+      phase === "idle" ||
+      phase === "waiting" ||
+      phase === "go" ||
+      phase === "early" ||
+      phase === "result";
+    if (!interactivePhase) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.repeat) return;
+      if (e.code !== "Space" && e.code !== "Enter") return;
+      const target = e.target as HTMLElement | null;
+      if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA")) return;
+      e.preventDefault();
+      tap();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [phase, tap]);
 
   function submit() {
     startTransition(async () => {
-      const before = new Set(board.entries.map((e) => e.id));
-      const next = await submitScore(name, times);
-      const mine = next.entries.find((e) => !before.has(e.id));
-      setSavedId(mine?.id ?? null);
-      setBoard(next);
+      const result = await submitScore(name, times);
+      setSavedId(result.savedId);
+      setRank(
+        result.rank !== null && result.total !== null
+          ? { rank: result.rank, total: result.total }
+          : null,
+      );
+      setBoard(result.board);
       setPhase("submitted");
     });
   }
@@ -156,6 +240,19 @@ export function ReflexGame({ initial }: { initial: Leaderboard }) {
             </span>
           </div>
           <div className="flex items-baseline gap-4 font-mono text-xs text-slate-500">
+            <button
+              type="button"
+              onClick={toggleSound}
+              aria-pressed={sound}
+              aria-label={sound ? "Mute sound" : "Unmute sound"}
+              className={`rounded-md px-2 py-0.5 text-[11px] transition ${
+                sound
+                  ? "bg-emerald-400/10 text-emerald-300"
+                  : "bg-white/5 text-slate-500 hover:text-slate-300"
+              }`}
+            >
+              {sound ? "sound on" : "sound off"}
+            </button>
             <span>
               best{" "}
               <b className="text-base font-semibold text-slate-100">
@@ -196,6 +293,12 @@ export function ReflexGame({ initial }: { initial: Leaderboard }) {
                 <span className="max-w-xs text-sm text-slate-400">
                   The screen turns red. When it flashes green, tap. Don&apos;t
                   jump the gun.
+                </span>
+                <span className="mt-1 hidden items-center gap-1.5 text-xs text-slate-500 sm:flex">
+                  or press
+                  <kbd className="rounded-md border border-white/10 bg-white/5 px-1.5 py-0.5 font-mono text-[11px] text-slate-300">
+                    Space
+                  </kbd>
                 </span>
               </>
             )}
@@ -323,8 +426,12 @@ export function ReflexGame({ initial }: { initial: Leaderboard }) {
               </form>
             )}
             {phase === "submitted" && (
-              <p className="text-sm text-emerald-300">
-                Saved to the leaderboard.
+              <p className="text-sm text-emerald-300" data-testid="rank">
+                {rank
+                  ? rank.rank <= 10
+                    ? `Saved. You're #${rank.rank} of ${rank.total}.`
+                    : `Saved. You're #${rank.rank} of ${rank.total}. Top 10 starts at ${board.entries[board.entries.length - 1]?.averageMs}ms.`
+                  : "Saved to the leaderboard."}
               </p>
             )}
             <button
@@ -399,7 +506,7 @@ export function ReflexGame({ initial }: { initial: Leaderboard }) {
           )}
         </ol>
         <div className="border-t border-white/5 px-5 py-3 text-[11px] text-slate-500">
-          Ranked by 5-round average. Top 10.
+          Best run per name, ranked by 5-round average. Top 10.
         </div>
       </aside>
     </div>
