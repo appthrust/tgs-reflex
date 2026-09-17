@@ -37,20 +37,20 @@ function average(times: number[]) {
 }
 
 function rating(ms: number) {
-  if (ms < 200) return { label: "Lightning", tone: "text-emerald-300" };
-  if (ms < 250) return { label: "Sharp", tone: "text-sky-300" };
-  if (ms < 320) return { label: "Human", tone: "text-slate-200" };
-  return { label: "Sleepy", tone: "text-amber-300" };
+  if (ms < 200) return { label: "Lightning", tone: "text-accent-text" };
+  if (ms < 250) return { label: "Sharp", tone: "text-info" };
+  if (ms < 320) return { label: "Human", tone: "text-fg" };
+  return { label: "Sleepy", tone: "text-warn" };
 }
 
 const ARENA_CLASS: Record<Phase, string> = {
-  idle: "arena-idle",
+  idle: "arena-neutral",
   waiting: "arena-waiting",
   go: "arena-go",
   early: "arena-early",
-  result: "arena-result",
-  finished: "arena-done",
-  submitted: "arena-done",
+  result: "arena-neutral",
+  finished: "arena-neutral",
+  submitted: "arena-neutral",
 };
 
 const SOUND_KEY = "reflex:sound";
@@ -227,19 +227,19 @@ export function ReflexGame({ initial }: { initial: Leaderboard }) {
                   key={i}
                   className={`h-2.5 rounded-full transition-all duration-300 ${
                     filled
-                      ? "w-8 bg-emerald-400"
+                      ? "w-8 bg-accent"
                       : active
-                        ? "w-8 bg-white/70"
-                        : "w-2.5 bg-white/15"
+                        ? "w-8 bg-muted"
+                        : "w-2.5 bg-track"
                   }`}
                 />
               );
             })}
-            <span className="ml-2 font-mono text-xs text-slate-500">
+            <span className="ml-2 font-mono text-xs text-faint">
               {currentRound}/{ROUNDS}
             </span>
           </div>
-          <div className="flex items-baseline gap-4 font-mono text-xs text-slate-500">
+          <div className="flex items-baseline gap-4 font-mono text-xs text-faint">
             <button
               type="button"
               onClick={toggleSound}
@@ -247,24 +247,24 @@ export function ReflexGame({ initial }: { initial: Leaderboard }) {
               aria-label={sound ? "Mute sound" : "Unmute sound"}
               className={`rounded-md px-2 py-0.5 text-[11px] transition ${
                 sound
-                  ? "bg-emerald-400/10 text-emerald-300"
-                  : "bg-white/5 text-slate-500 hover:text-slate-300"
+                  ? "bg-accent-soft text-accent-text"
+                  : "bg-kbd text-faint hover:text-fg"
               }`}
             >
               {sound ? "sound on" : "sound off"}
             </button>
             <span>
               best{" "}
-              <b className="text-base font-semibold text-slate-100">
+              <b className="text-base font-semibold text-fg">
                 {best || "–"}
               </b>
             </span>
             <span>
               avg{" "}
-              <b className="text-base font-semibold text-slate-100">
+              <b className="text-base font-semibold text-fg">
                 {avg || "–"}
               </b>
-              <span className="text-slate-500">ms</span>
+              <span className="text-faint">ms</span>
             </span>
           </div>
         </div>
@@ -275,13 +275,13 @@ export function ReflexGame({ initial }: { initial: Leaderboard }) {
             data-testid="arena"
             data-phase={phase}
             onPointerDown={tap}
-            className={`relative flex h-[420px] w-full select-none flex-col items-center justify-center gap-3 overflow-hidden rounded-3xl px-6 text-center text-white outline-none transition-[background,box-shadow] duration-200 focus-visible:ring-2 focus-visible:ring-white/60 ${ARENA_CLASS[phase]}`}
+            className={`relative flex h-[420px] w-full select-none flex-col items-center justify-center gap-3 overflow-hidden rounded-3xl px-6 text-center outline-none transition-[background,box-shadow,color] duration-200 focus-visible:ring-2 focus-visible:ring-accent/60 ${ARENA_CLASS[phase]}`}
           >
             {phase === "idle" && (
               <>
                 <span className="relative flex h-24 w-24 items-center justify-center">
-                  <span className="anim-ring absolute inset-0 rounded-full border-2 border-emerald-400/60" />
-                  <span className="flex h-16 w-16 items-center justify-center rounded-full bg-emerald-400/15 text-emerald-300 ring-1 ring-emerald-400/40">
+                  <span className="anim-ring absolute inset-0 rounded-full border-2 border-accent/60" />
+                  <span className="flex h-16 w-16 items-center justify-center rounded-full bg-accent-soft text-accent-text ring-1 ring-accent/40">
                     <svg viewBox="0 0 24 24" className="h-7 w-7" fill="currentColor" aria-hidden>
                       <path d="M13 2 4 14h6l-1 8 9-12h-6l1-8z" />
                     </svg>
@@ -290,13 +290,13 @@ export function ReflexGame({ initial }: { initial: Leaderboard }) {
                 <span className="mt-2 text-2xl font-semibold tracking-tight">
                   Tap to start
                 </span>
-                <span className="max-w-xs text-sm text-slate-400">
+                <span className="max-w-xs text-sm text-muted">
                   The screen turns red. When it flashes green, tap. Don&apos;t
                   jump the gun.
                 </span>
-                <span className="mt-1 hidden items-center gap-1.5 text-xs text-slate-500 sm:flex">
+                <span className="mt-1 hidden items-center gap-1.5 text-xs text-faint sm:flex">
                   or press
-                  <kbd className="rounded-md border border-white/10 bg-white/5 px-1.5 py-0.5 font-mono text-[11px] text-slate-300">
+                  <kbd className="rounded-md border border-line bg-kbd px-1.5 py-0.5 font-mono text-[11px] text-fg">
                     Space
                   </kbd>
                 </span>
@@ -329,7 +329,7 @@ export function ReflexGame({ initial }: { initial: Leaderboard }) {
             )}
             {phase === "result" && (
               <>
-                <span className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">
+                <span className="text-xs font-semibold uppercase tracking-[0.3em] text-faint">
                   Round {times.length}
                 </span>
                 <span
@@ -337,14 +337,14 @@ export function ReflexGame({ initial }: { initial: Leaderboard }) {
                   data-testid="last-ms"
                 >
                   {lastMs}
-                  <span className="ml-1 text-2xl font-medium text-slate-400">
+                  <span className="ml-1 text-2xl font-medium text-faint">
                     ms
                   </span>
                 </span>
                 <span className={`text-sm font-medium ${rating(lastMs).tone}`}>
                   {rating(lastMs).label}
                 </span>
-                <span className="mt-2 text-sm text-slate-400">
+                <span className="mt-2 text-sm text-muted">
                   Tap for the next round
                 </span>
               </>
@@ -357,7 +357,7 @@ export function ReflexGame({ initial }: { initial: Leaderboard }) {
             className={`flex min-h-[420px] w-full flex-col items-center justify-center gap-6 rounded-3xl px-6 py-8 text-center ${ARENA_CLASS[phase]}`}
           >
             <div className="anim-pop">
-              <span className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">
+              <span className="text-xs font-semibold uppercase tracking-[0.3em] text-faint">
                 Your average
               </span>
               <p
@@ -365,7 +365,7 @@ export function ReflexGame({ initial }: { initial: Leaderboard }) {
                 data-testid="final-avg"
               >
                 {avg}
-                <span className="ml-1 text-2xl font-medium text-slate-400">
+                <span className="ml-1 text-2xl font-medium text-faint">
                   ms
                 </span>
               </p>
@@ -377,11 +377,11 @@ export function ReflexGame({ initial }: { initial: Leaderboard }) {
             <ul className="flex w-full max-w-sm flex-col gap-1.5 font-mono text-xs">
               {times.map((t, i) => (
                 <li key={i} className="flex items-center gap-3">
-                  <span className="w-4 text-right text-slate-500">{i + 1}</span>
-                  <span className="h-2 flex-1 overflow-hidden rounded-full bg-white/10">
+                  <span className="w-4 text-right text-faint">{i + 1}</span>
+                  <span className="h-2 flex-1 overflow-hidden rounded-full bg-track">
                     <span
                       className={`anim-grow block h-full rounded-full ${
-                        t === best ? "bg-emerald-400" : "bg-sky-400/80"
+                        t === best ? "bg-accent" : "bg-info/70"
                       }`}
                       style={{
                         width: `${Math.max(8, (t / maxTime) * 100)}%`,
@@ -389,7 +389,7 @@ export function ReflexGame({ initial }: { initial: Leaderboard }) {
                       }}
                     />
                   </span>
-                  <span className="w-12 text-right tabular-nums text-slate-300">
+                  <span className="w-12 text-right tabular-nums text-muted">
                     {t}
                   </span>
                 </li>
@@ -410,12 +410,12 @@ export function ReflexGame({ initial }: { initial: Leaderboard }) {
                   maxLength={MAX_NAME_LENGTH}
                   placeholder="your name"
                   autoFocus
-                  className="flex-1 rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white placeholder:text-slate-500 outline-none transition focus:border-emerald-400/60 focus:bg-white/10"
+                  className="flex-1 rounded-xl border border-line bg-input px-4 py-2.5 text-sm text-fg placeholder:text-faint outline-none transition focus:border-accent/60"
                 />
                 <button
                   type="submit"
                   disabled={isPending || !board.connected}
-                  className="whitespace-nowrap rounded-xl bg-emerald-400 px-4 py-2.5 text-sm font-semibold text-emerald-950 shadow-[0_10px_30px_-10px_rgba(52,211,153,0.8)] transition hover:bg-emerald-300 disabled:cursor-not-allowed disabled:bg-white/10 disabled:text-slate-500 disabled:shadow-none"
+                  className="whitespace-nowrap rounded-xl bg-accent px-4 py-2.5 text-sm font-semibold text-emerald-950 shadow-[0_10px_30px_-10px_var(--accent)] transition hover:brightness-110 disabled:cursor-not-allowed disabled:bg-track disabled:text-faint disabled:shadow-none"
                 >
                   {isPending
                     ? "Saving…"
@@ -426,7 +426,7 @@ export function ReflexGame({ initial }: { initial: Leaderboard }) {
               </form>
             )}
             {phase === "submitted" && (
-              <p className="text-sm text-emerald-300" data-testid="rank">
+              <p className="text-sm text-accent-text" data-testid="rank">
                 {rank
                   ? rank.rank <= 10
                     ? `Saved. You're #${rank.rank} of ${rank.total}.`
@@ -437,7 +437,7 @@ export function ReflexGame({ initial }: { initial: Leaderboard }) {
             <button
               type="button"
               onClick={start}
-              className="rounded-xl border border-white/10 bg-white/5 px-5 py-2.5 text-sm font-medium text-slate-200 transition hover:bg-white/10"
+              className="rounded-xl border border-line bg-kbd px-5 py-2.5 text-sm font-medium text-fg transition hover:bg-hover"
             >
               Play again
             </button>
@@ -446,26 +446,26 @@ export function ReflexGame({ initial }: { initial: Leaderboard }) {
       </section>
 
       <aside className="glass flex flex-col overflow-hidden rounded-3xl">
-        <div className="flex items-center justify-between border-b border-white/5 px-5 py-4">
+        <div className="flex items-center justify-between border-b border-line px-5 py-4">
           <h2 className="text-sm font-semibold tracking-tight">
             Fastest reflexes
           </h2>
           <span
             className={`inline-flex items-center gap-1.5 text-xs ${
-              board.connected ? "text-emerald-300" : "text-slate-500"
+              board.connected ? "text-accent-text" : "text-faint"
             }`}
           >
             <span
               className={`h-1.5 w-1.5 rounded-full ${
-                board.connected ? "bg-emerald-400" : "bg-slate-600"
+                board.connected ? "bg-accent" : "bg-faint"
               }`}
             />
             {board.connected ? "live" : "offline"}
           </span>
         </div>
-        <ol className="flex-1 divide-y divide-white/5" data-testid="leaderboard">
+        <ol className="flex-1 divide-y divide-line" data-testid="leaderboard">
           {board.entries.length === 0 ? (
-            <li className="px-5 py-12 text-center text-sm text-slate-500">
+            <li className="px-5 py-12 text-center text-sm text-faint">
               No scores yet. Be the first.
             </li>
           ) : (
@@ -475,37 +475,37 @@ export function ReflexGame({ initial }: { initial: Leaderboard }) {
                 <li
                   key={entry.id}
                   className={`flex items-center gap-3 px-5 py-2.5 text-sm transition ${
-                    mine ? "bg-emerald-400/10" : ""
+                    mine ? "bg-accent-soft" : ""
                   }`}
                 >
                   <span
                     className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full font-mono text-[11px] font-semibold ${
-                      MEDAL[index] ?? "bg-white/5 text-slate-400"
+                      MEDAL[index] ?? "bg-kbd text-muted"
                     }`}
                   >
                     {index + 1}
                   </span>
-                  <span className="flex-1 truncate text-slate-100">
+                  <span className="flex-1 truncate text-fg">
                     {entry.name}
                     {mine && (
-                      <span className="ml-2 text-[10px] font-medium uppercase tracking-wider text-emerald-300">
+                      <span className="ml-2 text-[10px] font-medium uppercase tracking-wider text-accent-text">
                         you
                       </span>
                     )}
                   </span>
-                  <span className="font-mono text-[11px] text-slate-500">
+                  <span className="font-mono text-[11px] text-faint">
                     best {entry.bestMs}
                   </span>
-                  <span className="font-mono text-sm font-semibold tabular-nums text-slate-100">
+                  <span className="font-mono text-sm font-semibold tabular-nums text-fg">
                     {entry.averageMs}
-                    <span className="text-[10px] font-normal text-slate-500">ms</span>
+                    <span className="text-[10px] font-normal text-faint">ms</span>
                   </span>
                 </li>
               );
             })
           )}
         </ol>
-        <div className="border-t border-white/5 px-5 py-3 text-[11px] text-slate-500">
+        <div className="border-t border-line px-5 py-3 text-[11px] text-faint">
           Best run per name, ranked by 5-round average. Top 10.
         </div>
       </aside>
