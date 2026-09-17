@@ -1,21 +1,15 @@
-# AppThrust Next.js PostgreSQL template
+# Reflex
 
-This starter proves the AppThrust managed PostgreSQL path:
+A tiny reaction-time game deployed on AppThrust with `apth`.
 
-- AppThrust injects `DATABASE_URL` through `ComponentConnection`.
-- The initial schema is applied through `DatabaseChange`.
-- The Next.js app reads and writes `appthrust_demo_messages`.
-
-The app does not run migrations on startup. For local development, apply
-`db/migrations/0001_init.sql` to your PostgreSQL database, then set:
+- Tap to start, wait for the screen to turn green, then tap as fast as you can.
+- Five rounds; the lowest average wins.
+- Scores are stored in the managed PostgreSQL database injected as `DATABASE_URL`.
+  The table is created lazily on first use.
 
 ```bash
-DATABASE_URL=postgresql://app:password@localhost:5432/app
+npm ci
+npm run dev   # without DATABASE_URL the leaderboard shows "not connected"
 ```
 
-Run locally:
-
-```bash
-npm install
-npm run dev
-```
+Live: https://tgs-reflex.appthrust.dev/

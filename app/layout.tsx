@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "AppThrust PostgreSQL sample",
-  description: "A database-backed starter application for AppThrust",
+  title: "Reflex · AppThrust sample",
+  description: "A reaction-time game with a PostgreSQL leaderboard, deployed with apth",
 };
 
 export default function RootLayout({

@@ -1,33 +1,13 @@
 import { Pool } from "pg";
+import type { Leaderboard } from "./scores";
 
-export type DatabaseStatus =
-  | "ready"
-  | "missing-url"
-  | "migration-pending"
-  | "unavailable";
-
-export interface DemoMessage {
-  id: number;
-  body: string;
-  createdAt: string;
-}
-
-export interface DemoDatabaseState {
-  status: DatabaseStatus;
-  databaseUrlPresent: boolean;
-  databaseName?: string;
-  host?: string;
-  messages: DemoMessage[];
-}
+const LEADERBOARD_LIMIT = 10;
 
 let pool: Pool | undefined;
-
-function databaseUrl() {
-  return process.env.DATABASE_URL?.trim() ?? "";
-}
+let schemaReady: Promise<void> | undefined;
 
 function getPool() {
-  const connectionString = databaseUrl();
+  const connectionString = process.env.DATABASE_URL?.trim() ?? "";
   if (!connectionString) {
     return null;
   }
@@ -41,89 +21,73 @@ function getPool() {
   return pool;
 }
 
-export async function loadDemoMessages(): Promise<DemoDatabaseState> {
-  const connectionString = databaseUrl();
-  if (!connectionString) {
-    return {
-      status: "missing-url",
-      databaseUrlPresent: false,
-      messages: [],
-    };
-  }
+function ensureSchema(client: Pool) {
+  schemaReady ??= client
+    .query(
+      `CREATE TABLE IF NOT EXISTS tgs_reflex_scores (
+        id BIGSERIAL PRIMARY KEY,
+        name TEXT NOT NULL,
+        average_ms INTEGER NOT NULL,
+        best_ms INTEGER NOT NULL,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+      )`,
+    )
+    .then(() => undefined)
+    .catch((error: unknown) => {
+      schemaReady = undefined;
+      throw error;
+    });
+  return schemaReady;
+}
 
-  const parsed = safeDatabaseUrl(connectionString);
+export async function loadLeaderboard(): Promise<Leaderboard> {
   const client = getPool();
   if (!client) {
-    return {
-      status: "missing-url",
-      databaseUrlPresent: false,
-      messages: [],
-    };
+    return { connected: false, entries: [] };
   }
 
   try {
+    await ensureSchema(client);
     const result = await client.query<{
       id: number;
-      body: string;
+      name: string;
+      average_ms: number;
+      best_ms: number;
       created_at: string;
-    }>(`
-      SELECT id, body, created_at::text
-      FROM appthrust_demo_messages
-      ORDER BY id DESC
-      LIMIT 8
-    `);
-
+    }>(
+      `SELECT id, name, average_ms, best_ms, created_at::text
+       FROM tgs_reflex_scores
+       ORDER BY average_ms ASC, best_ms ASC, id ASC
+       LIMIT $1`,
+      [LEADERBOARD_LIMIT],
+    );
     return {
-      status: "ready",
-      databaseUrlPresent: true,
-      databaseName: parsed.databaseName,
-      host: parsed.host,
-      messages: result.rows.map((row) => ({
+      connected: true,
+      entries: result.rows.map((row) => ({
         id: row.id,
-        body: row.body,
+        name: row.name,
+        averageMs: row.average_ms,
+        bestMs: row.best_ms,
         createdAt: row.created_at,
       })),
     };
-  } catch (error) {
-    return {
-      status: databaseTableMissing(error) ? "migration-pending" : "unavailable",
-      databaseUrlPresent: true,
-      databaseName: parsed.databaseName,
-      host: parsed.host,
-      messages: [],
-    };
+  } catch {
+    return { connected: false, entries: [] };
   }
 }
 
-export async function insertDemoMessage(body: string) {
+export async function insertScore(
+  name: string,
+  averageMs: number,
+  bestMs: number,
+) {
   const client = getPool();
   if (!client) {
     return;
   }
-
+  await ensureSchema(client);
   await client.query(
-    "INSERT INTO appthrust_demo_messages (body) VALUES ($1)",
-    [body],
+    "INSERT INTO tgs_reflex_scores (name, average_ms, best_ms) VALUES ($1, $2, $3)",
+    [name, averageMs, bestMs],
   );
-}
-
-function databaseTableMissing(error: unknown) {
-  return (
-    typeof error === "object" &&
-    error !== null &&
-    "code" in error &&
-    error.code === "42P01"
-  );
-}
-
-function safeDatabaseUrl(connectionString: string) {
-  try {
-    const parsed = new URL(connectionString);
-    return {
-      databaseName: parsed.pathname.replace(/^\//, "") || undefined,
-      host: parsed.hostname || undefined,
-    };
-  } catch {
-    return {};
-  }
 }
